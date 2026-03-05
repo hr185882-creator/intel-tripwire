@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Intel Tripwire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#ffffff; --bg2:#f7f7f7; --bg3:#efefef; --border:#e0e0e0; --border2:#d0d0d0;
+    --black:#0a0a0a; --ink:#1a1a1a; --mid:#555555; --muted:#999999; --faint:#cccccc;
+    --red:#cc0000; --red2:#e60000; --red-bg:#fff5f5;
+    --mono:'DM Mono', monospace; --sans:'DM Sans', sans-serif; --display:'Playfair Display', serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;overflow:hidden}
+
+  #app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:188px 1fr 320px;height:100vh}
+  #topbar{grid-column:1/-1;background:var(--black);display:flex;align-items:center;padding:0 18px;gap:20px;border-bottom:3px solid var(--red)}
+  #sidebar{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto}
+  #main{overflow-y:auto;background:var(--bg)}
+  #newsbar{background:var(--bg);border-left:1px solid var(--border);overflow-y:auto}
+
+  .logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff;letter-spacing:-0.01em;white-space:nowrap}
+  .logo .accent{color:var(--red2)}
+  .logo .sub{font-size:10px;font-family:var(--mono);font-weight:300;color:#888;letter-spacing:.12em;text-transform:uppercase;display:block;margin-top:-3px}
+  .topbar-sep{width:1px;height:22px;background:#333}
+  .stat{display:flex;flex-direction:column;gap:1px}
+  .stat-val{font-family:var(--mono);font-size:15px;font-weight:500;color:#fff;line-height:1}
+  .stat-lbl{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.1em}
+  .stat-val.green{color:#44cc44}
+  .stat-val.amber{color:#ffaa00}
+
+  .status-row{display:flex;align-items:center;gap:6px}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:#444}
+  .status-dot.live{background:#44cc44;box-shadow:0 0 8px #44cc44;animation:blink 2.5s infinite}
+  @keyframes blink{0%,100%{opacity:1}60%{opacity:.4}}
+  .status-label{font-family:var(--mono);font-size:10px;color:#666}
+  .scan-time{font-family:var(--mono);font-size:10px;color:#555;margin-left:auto}
+
+  #search-input{
+    background:#1a1a1a;border:1px solid #333;border-bottom:1px solid #555;color:#ccc;
+    font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:0;width:220px;outline:none;letter-spacing:.02em
+  }
+  #search-input:focus{border-color:var(--red);color:#fff}
+  #search-input::placeholder{color:#444}
+
+  .sidebar-masthead{padding:14px 14px 10px;border-bottom:2px solid var(--black)}
+  .sidebar-masthead-title{font-family:var(--display);font-size:11px;font-weight:700;color:var(--black);text-transform:uppercase;letter-spacing:.08em}
+  .sidebar-section{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:10px 14px 5px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .cat-item{padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s;border-left:3px solid transparent;border-bottom:1px solid var(--border)}
+  .cat-item:hover{background:var(--bg3)}
+  .cat-item.active{background:var(--red-bg);border-left-color:var(--red)}
+  .cat-item.active .cat-label{color:var(--red);font-weight:500}
+  .cat-icon{font-size:11px;width:14px;text-align:center;color:var(--muted)}
+  .cat-label{flex:1;font-size:12px;color:var(--ink)}
+  .cat-count{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+  .tab-bar{display:flex;gap:0;border-bottom:2px solid var(--black);background:var(--bg);position:sticky;top:0;z-index:10}
+  .tab{padding:10px 16px;font-family:var(--mono);font-size:10px;font-weight:500;cursor:pointer;color:var(--muted);
+       border-bottom:3px solid transparent;margin-bottom:-2px;text-transform:uppercase;letter-spacing:.1em;transition:all .15s}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--red);border-bottom-color:var(--red)}
+
+  .markets-table{width:100%;border-collapse:collapse}
+  .markets-table th{
+    font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;
+    padding:8px 12px;text-align:left;border-bottom:2px solid var(--black);background:var(--bg);font-weight:500;position:sticky;top:41px
+  }
+  .markets-table th.right{text-align:right}
+  .markets-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  .markets-table tr:hover td{background:var(--red-bg);cursor:pointer}
+
+  .market-title{font-size:12px;color:var(--black);line-height:1.5;max-width:380px;font-weight:400}
+  .market-title a{color:inherit;text-decoration:none}
+  .market-title a:hover{color:var(--red);text-decoration:underline}
+  .market-tags{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+  .tag-pill{font-size:9px;padding:1px 5px;border:1px solid var(--faint);color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em}
+
+  .price-cell{font-family:var(--mono);font-size:13px;font-weight:500;text-align:right;white-space:nowrap}
+  .price-high{color:#007a33}
+  .price-mid{color:#b35c00}
+  .price-low{color:var(--red)}
+  .vol-cell{font-family:var(--mono);font-size:11px;color:var(--mid);text-align:right;white-space:nowrap}
+  .vol-m{color:#007a33;font-weight:500}
+  .vol-k{color:var(--mid)}
+  .signal-badge{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;padding:2px 5px;background:#fff0f0;color:var(--red);border:1px solid #ffcccc;font-weight:500}
+
+  .signal-card{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+  .signal-card:hover{background:var(--red-bg)}
+  .signal-score-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:500;padding:2px 6px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  .score-high{background:var(--black);color:var(--red2)}
+  .score-mid{background:var(--red-bg);color:var(--red);border:1px solid #ffcccc}
+  .score-low{background:var(--bg3);color:var(--mid);border:1px solid var(--border2)}
+  .signal-market{font-size:12px;color:var(--black);font-weight:500;line-height:1.4;margin-bottom:4px}
+  .signal-market a{color:inherit;text-decoration:none}
+  .signal-market a:hover{color:var(--red)}
+  .signal-news{font-size:12px;color:var(--mid);line-height:1.4;margin-bottom:5px}
+  .signal-kws{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
+  .signal-kw{font-family:var(--mono);font-size:9px;padding:1px 5px;background:var(--bg3);color:var(--red);border:1px solid #ffcccc;text-transform:uppercase;letter-spacing:.04em}
+  .signal-meta{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .dot-sep{color:var(--faint)}
+
+  .news-header{padding:12px 14px 10px;border-bottom:2px solid var(--black);display:flex;align-items:baseline;gap:8px;position:sticky;top:0;background:var(--bg);z-index:10}
+  .news-header-title{font-family:var(--display);font-size:14px;font-weight:700;color:var(--black)}
+  .news-count{font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .news-card{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+  .news-card:hover{background:var(--red-bg)}
+  .news-headline{font-size:12px;color:var(--black);line-height:1.5;margin-bottom:4px;font-weight:400}
+  .news-headline a{color:inherit;text-decoration:none}
+  .news-headline a:hover{color:var(--red);text-decoration:underline}
+  .news-meta{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .news-cat-bar{width:3px;height:12px;flex-shrink:0;background:var(--red)}
+
+  .loading{padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px}
+  .loading-bar{width:100px;height:2px;background:var(--border);margin:12px auto 0;overflow:hidden}
+  .loading-bar-fill{height:100%;width:40%;background:var(--red);animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+  .empty{padding:32px;text-align:center;color:var(--muted);font-size:12px;font-family:var(--mono)}
+
+  #search-overlay{
+    display:none;position:fixed;top:52px;left:188px;right:320px;background:var(--bg);
+    border:1px solid var(--black);border-top:3px solid var(--red);z-index:100;max-height:420px;overflow-y:auto;
+    box-shadow:4px 4px 0 rgba(0,0,0,0.15)
+  }
+  #search-overlay.visible{display:block}
+  .search-section-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
+    padding:8px 12px 4px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .search-result{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+  .search-result:hover{background:var(--red-bg)}
+  .search-result-title{font-size:12px;color:var(--black);margin-bottom:3px}
+  .search-result-meta{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--faint);border-radius:0}
+  ::-webkit-scrollbar-thumb:hover{background:var(--red)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="logo">INTEL <span class="accent">TRIPWIRE</span><span class="sub">Signal Detection System</span></div>
+    <div class="topbar-sep"></div>
+    <div class="stat"><div class="stat-val" id="stat-markets">—</div><div class="stat-lbl">Markets</div></div>
+    <div class="stat"><div class="stat-val" id="stat-news">—</div><div class="stat-lbl">Articles</div></div>
+    <div class="stat"><div class="stat-val" id="stat-signals">—</div><div class="stat-lbl">Signals</div></div>
+    <div class="stat"><div class="stat-val amber" id="stat-movers">—</div><div class="stat-lbl">Movers</div></div>
+    <div class="stat"><div class="stat-val green" id="stat-whales">—</div><div class="stat-lbl">Whales</div></div>
+    <div class="stat"><div class="stat-val" id="stat-briefs">—</div><div class="stat-lbl">Briefs</div></div>
+    <div class="topbar-sep"></div>
+    <div class="status-row"><div class="status-dot" id="status-dot"></div><div class="status-label" id="status-label">OFFLINE</div></div>
+    <input id="search-input" placeholder="Search markets + news..." type="text" />
+    <div class="scan-time" id="scan-time">Waiting for server...</div>
+  </div>
+
+  <div id="sidebar">
+    <div class="sidebar-masthead"><div class="sidebar-masthead-title">Categories</div></div>
+    <div class="cat-item active" data-cat="" onclick="selectCategory('')" id="cat-all">
+      <span class="cat-icon">◈</span><span class="cat-label">All Markets</span><span class="cat-count" id="cat-count-all">—</span>
+    </div>
+    <div id="cat-list"></div>
+    <div class="sidebar-section">Intelligence</div>
+    <div class="cat-item" onclick="selectTab('signals')"><span class="cat-icon" style="color:var(--red)">◎</span><span class="cat-label">Signal Feed</span><span class="cat-count" id="sidebar-sig-count">—</span></div>
+    <div class="cat-item" onclick="selectTab('movers')"><span class="cat-icon" style="color:#b35c00">↕</span><span class="cat-label">Price Movers</span><span class="cat-count" id="sidebar-movers-count">—</span></div>
+    <div class="cat-item" onclick="selectTab('whales')"><span class="cat-icon" style="color:#007a33">◉</span><span class="cat-label">Whale Orders</span><span class="cat-count" id="sidebar-whales-count">—</span></div>
+    <div class="cat-item" onclick="selectTab('briefs')"><span class="cat-icon" style="color:#333">◧</span><span class="cat-label">AI Briefs</span><span class="cat-count" id="sidebar-briefs-count">—</span></div>
+  </div>
+
+  <div id="main">
+    <div class="tab-bar">
+      <div class="tab active" data-tab="markets" onclick="selectTab('markets')">Markets</div>
+      <div class="tab" data-tab="signals" onclick="selectTab('signals')">Signals</div>
+      <div class="tab" data-tab="movers" onclick="selectTab('movers')">Movers</div>
+      <div class="tab" data-tab="whales" onclick="selectTab('whales')">Whales</div>
+      <div class="tab" data-tab="briefs" onclick="selectTab('briefs')">AI Briefs</div>
+    </div>
+
+    <div id="view-markets">
+      <table class="markets-table">
+        <thead><tr><th>Market</th><th class="right">YES</th><th class="right">NO</th><th class="right">Volume</th><th class="right">Signals</th></tr></thead>
+        <tbody id="markets-tbody">
+          <tr><td colspan="5"><div class="loading">Connecting...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="view-signals" style="display:none"><div id="signals-list"><div class="loading">Loading signals...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></div></div>
+    <div id="view-movers" style="display:none"><div id="movers-list"><div class="loading">Tracking price velocity...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></div></div>
+    <div id="view-whales" style="display:none"><div id="whales-list"><div class="loading">Watching order flow...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></div></div>
+    <div id="view-briefs" style="display:none"><div id="briefs-list"><div class="loading">Waiting for high-score signals...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></div></div>
+  </div>
+
+  <div id="newsbar">
+    <div class="news-header"><div class="news-header-title">Live Feed</div><div class="news-count" id="news-count">— articles</div></div>
+    <div id="news-list"><div class="loading">Fetching news...<div class="loading-bar"><div class="loading-bar-fill"></div></div></div></div>
+  </div>
+</div>
+
+<div id="search-overlay"></div>
+
+<script>
+  // Same-origin API: fetch("/status") etc. Works behind Render without CORS/Mixed Content.
+  const API = "";
+
+  let currentCat = "";
+  let currentTab = "markets";
+  let allSignals = [];
+
+  async function apiFetch(path) {
+    try {
+      const r = await fetch(API + path, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (e) { return null; }
+  }
+
+  function fmtVol(v) {
+    if (v >= 1e6) return `<span class="vol-m">$${(v/1e6).toFixed(1)}M</span>`;
+    if (v >= 1e3) return `<span class="vol-k">$${(v/1e3).toFixed(0)}K</span>`;
+    return `$${Number(v||0).toFixed(0)}`;
+  }
+  function fmtPrice(p) {
+    const pct = ((p||0)*100).toFixed(1);
+    const cls = p >= 0.6 ? "price-high" : p >= 0.35 ? "price-mid" : "price-low";
+    return `<span class="price-cell ${cls}">${pct}¢</span>`;
+  }
+  function fmtAge(mins) {
+    mins = Number(mins||9999);
+    if (mins < 60) return `${mins}m`;
+    if (mins < 1440) return `${Math.floor(mins/60)}h`;
+    return `${Math.floor(mins/1440)}d`;
+  }
+  function fmtScore(s) {
+    const pct = Math.round((s||0) * 100);
+    const cls = s >= 0.2 ? "score-high" : s >= 0.12 ? "score-mid" : "score-low";
+    return `<span class="signal-score-badge ${cls}">▲ ${pct}% match</span>`;
+  }
+
+  async function refreshStatus() {
+    const data = await apiFetch("/status");
+    if (!data) {
+      document.getElementById("status-dot").className = "status-dot";
+      document.getElementById("status-label").textContent = "OFFLINE";
+      document.getElementById("scan-time").textContent = "Server unavailable";
+      return false;
+    }
+    document.getElementById("status-dot").className = "status-dot live";
+    document.getElementById("status-label").textContent = "LIVE";
+    document.getElementById("stat-markets").textContent = data.total_markets ?? "—";
+    document.getElementById("stat-news").textContent = data.total_news ?? "—";
+    document.getElementById("stat-signals").textContent = data.total_signals ?? "—";
+    document.getElementById("stat-movers").textContent = data.total_movers ?? "—";
+    document.getElementById("stat-whales").textContent = data.total_whales ?? "—";
+    document.getElementById("stat-briefs").textContent = data.total_briefs ?? "—";
+    document.getElementById("sidebar-sig-count").textContent = data.total_signals ?? "—";
+    document.getElementById("sidebar-movers-count").textContent = data.total_movers ?? "—";
+    document.getElementById("sidebar-whales-count").textContent = data.total_whales ?? "—";
+    document.getElementById("sidebar-briefs-count").textContent = data.total_briefs ?? "—";
+    const t = data.last_market_scan ? new Date(data.last_market_scan).toLocaleTimeString() : "scanning...";
+    document.getElementById("scan-time").textContent = `Scanned ${t}`;
+    return true;
+  }
+
+  async function refreshCategories() {
+    const data = await apiFetch("/categories");
+    if (!data) return;
+    let total = 0;
+    const html = Object.entries(data.categories || {}).map(([slug, c]) => {
+      total += c.market_count || 0;
+      const active = currentCat === slug;
+      return `<div class="cat-item${active ? " active" : ""}" data-cat="${slug}" onclick="selectCategory('${slug}')">
+        <span class="cat-icon" style="color:${active ? "var(--red)" : (c.color||"#888")}">${c.icon||"○"}</span>
+        <span class="cat-label">${c.label || slug}${c.auto ? '<span style="color:var(--faint);font-size:8px;margin-left:3px">AUTO</span>' : ""}</span>
+        <span class="cat-count">${c.market_count||0}</span>
+      </div>`;
+    }).join("");
+    document.getElementById("cat-list").innerHTML = html;
+    document.getElementById("cat-count-all").textContent = total;
+  }
+
+  async function refreshMarkets() {
+    if (currentTab !== "markets") return;
+    const path = currentCat ? `/markets?category=${encodeURIComponent(currentCat)}&limit=60` : "/markets?limit=60";
+    const data = await apiFetch(path);
+    if (!data) return;
+
+    const sigData = await apiFetch("/signals?limit=300");
+    const sigCounts = {};
+    (sigData?.signals || []).forEach(s => { sigCounts[s.market_id] = (sigCounts[s.market_id] || 0) + 1; });
+
+    const tbody = document.getElementById("markets-tbody");
+    if (!(data.markets || []).length) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty">No markets yet — scanning...</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.markets.map(m => {
+      const sigs = sigCounts[m.id] || 0;
+      const tags = (m.tags || []).slice(0,3).map(t => `<span class="tag-pill">${t}</span>`).join("");
+      const sigBadge = sigs ? `<span class="signal-badge">⚡ ${sigs}</span>` : "";
+      return `<tr onclick="selectMarket('${m.id}','${String(m.title||"").replace(/'/g,"\\'")}')">
+        <td>
+          <div class="market-title"><a href="${m.url}" target="_blank" onclick="event.stopPropagation()">${m.title}</a></div>
+          ${tags ? `<div class="market-tags">${tags}</div>` : ""}
+        </td>
+        <td>${fmtPrice(m.yes_price)}</td>
+        <td>${fmtPrice(m.no_price)}</td>
+        <td class="vol-cell">${fmtVol(m.volume)}</td>
+        <td style="text-align:right;white-space:nowrap">${sigBadge}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function refreshSignals() {
+    const path = currentCat ? `/signals?category=${encodeURIComponent(currentCat)}&limit=100` : "/signals?limit=100";
+    const data = await apiFetch(path);
+    if (!data) return;
+    allSignals = data.signals || [];
+    if (currentTab === "signals") renderSignals(allSignals);
+  }
+
+  function renderSignals(signals) {
+    const el = document.getElementById("signals-list");
+    if (!signals.length) { el.innerHTML = `<div class="empty">No signals yet</div>`; return; }
+    el.innerHTML = signals.map(s => {
+      const kws = (s.matched_keywords || []).slice(0,6).map(k => `<span class="signal-kw">${k}</span>`).join("");
+      const age = fmtAge(s.article_age_mins);
+      const resTag = s.requires_official
+        ? `<span class="signal-kw" style="background:#fff8e6;color:#7a5200;border-color:#ffe0a0">NEEDS OFFICIAL ACTION</span>`
+        : "";
+      return `<div class="signal-card" onclick="window.open('${s.article_url}','_blank')">
+        ${fmtScore(s.score)}${resTag ? " " + resTag : ""}
+        <div class="signal-market"><a href="${s.market_url}" target="_blank" onclick="event.stopPropagation()">📊 ${s.market_title}</a></div>
+        <div class="signal-news">📰 ${s.article_title}</div>
+        ${kws ? `<div class="signal-kws">${kws}</div>` : ""}
+        <div class="signal-meta">
+          <span>${s.article_source}</span><span class="dot-sep">·</span>
+          <span>${age} ago</span><span class="dot-sep">·</span>
+          <span style="color:var(--red)">${s.category}</span><span class="dot-sep">·</span>
+          <span>YES ${((s.yes_price||0)*100).toFixed(0)}¢</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function refreshNews() {
+    const path = currentCat ? `/news?category=${encodeURIComponent(currentCat)}&limit=40` : "/news?limit=40";
+    const data = await apiFetch(path);
+    if (!data) return;
+    document.getElementById("news-count").textContent = `${data.count || 0} articles`;
+    const el = document.getElementById("news-list");
+    if (!(data.news || []).length) { el.innerHTML = `<div class="empty">Fetching feeds...</div>`; return; }
+    el.innerHTML = data.news.map(a => {
+      const age = fmtAge(a.age_mins);
+      return `<div class="news-card">
+        <div class="news-headline"><a href="${a.url}" target="_blank">${a.title}</a></div>
+        <div class="news-meta"><div class="news-cat-bar"></div><span>${a.source}</span><span class="dot-sep">·</span><span>${age} ago</span></div>
+      </div>`;
+    }).join("");
+  }
+
+  async function refreshMovers() {
+    if (currentTab !== "movers") return;
+    const data = await apiFetch("/movers?limit=40");
+    const el = document.getElementById("movers-list");
+    if (!data || !(data.movers || []).length) {
+      el.innerHTML = `<div class="empty">No movers yet<br><span style="font-size:10px;margin-top:6px;display:block">Threshold: ≥${data?.threshold||"8%"} over ${data?.window||"60m"}</span></div>`;
+      return;
+    }
+    el.innerHTML = (data.movers || []).map(m => {
+      const up = m.direction === "UP";
+      const icon = up ? "▲" : "▼";
+      const cls = up ? "price-high" : "price-low";
+      return `<div class="signal-card" onclick="window.open('${m.market_url}','_blank')">
+        <div class="signal-market">${icon} ${m.market_title}</div>
+        <div class="signal-meta">
+          <span>NOW ${((m.yes_price||0)*100).toFixed(1)}¢</span><span class="dot-sep">·</span>
+          <span>1H AGO ${((m.price_1h_ago||0)*100).toFixed(1)}¢</span><span class="dot-sep">·</span>
+          <span class="${cls}">${m.change_pct>0?"+":""}${m.change_pct}%</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function refreshWhales() {
+    if (currentTab !== "whales") return;
+    const data = await apiFetch("/whales?limit=50");
+    const el = document.getElementById("whales-list");
+    if (!data || !(data.whales || []).length) {
+      el.innerHTML = `<div class="empty">No whale orders yet<br><span style="font-size:10px;margin-top:6px;display:block">Threshold: ${data?.threshold||"$5,000"} per trade</span></div>`;
+      return;
+    }
+    el.innerHTML = (data.whales || []).map(w => {
+      return `<div class="signal-card" onclick="window.open('${w.market_url}','_blank')">
+        <div class="signal-market">🐋 ${w.tier} — $${Number(w.usd_size||0).toLocaleString()}</div>
+        <div class="signal-news">${w.side} ${Number(w.size||0).toLocaleString()} @ ${((w.price||0)*100).toFixed(1)}¢ — ${w.market_title}</div>
+        <div class="signal-meta"><span>${w.category}</span><span class="dot-sep">·</span><span>${w.trader}</span></div>
+      </div>`;
+    }).join("");
+  }
+
+  async function refreshBriefs() {
+    if (currentTab !== "briefs") return;
+    const data = await apiFetch("/briefs?limit=20");
+    const el = document.getElementById("briefs-list");
+    if (!data) { el.innerHTML = `<div class="empty">Server unavailable</div>`; return; }
+    if (!data.api_ready) {
+      el.innerHTML = `<div class="empty">AI briefs disabled (ANTHROPIC_API_KEY not set)</div>`;
+      return;
+    }
+    if (!(data.briefs || []).length) {
+      el.innerHTML = `<div class="empty">No briefs yet<br><span style="font-size:10px;margin-top:6px;display:block">Generates when score ≥ ${(data.threshold*100).toFixed(0)}%</span></div>`;
+      return;
+    }
+    el.innerHTML = (data.briefs || []).map(b => {
+      const t = b.generated_at ? new Date(b.generated_at).toLocaleTimeString() : "";
+      const score = b.score ? `${Math.round(b.score*100)}%` : "";
+      const paras = String(b.brief||"").split(/\n+/).filter(x=>x.trim());
+      return `<div class="signal-card">
+        <div class="signal-market">◧ AI Brief ${score}</div>
+        <div class="signal-news">${b.market_title}</div>
+        ${paras.map(p=>`<div style="margin-top:8px;font-size:12px;line-height:1.6;color:var(--ink)">${p}</div>`).join("")}
+        <div class="signal-meta" style="margin-top:10px">Generated ${t}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function selectCategory(cat) {
+    currentCat = cat;
+    document.querySelectorAll(".cat-item").forEach(el => {
+      const active = el.dataset.cat === cat || (cat==="" && el.id==="cat-all");
+      el.classList.toggle("active", active);
+    });
+    refreshAll();
+  }
+
+  const ALL_TABS = ["markets","signals","movers","whales","briefs"];
+  function selectTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab===tab));
+    ALL_TABS.forEach(v => {
+      const el = document.getElementById(`view-${v}`);
+      if (el) el.style.display = tab===v ? "" : "none";
+    });
+    if (tab==="markets") refreshMarkets();
+    if (tab==="signals") renderSignals(allSignals);
+    if (tab==="movers") refreshMovers();
+    if (tab==="whales") refreshWhales();
+    if (tab==="briefs") refreshBriefs();
+  }
+
+  async function selectMarket(id, title) {
+    selectTab("signals");
+    const data = await apiFetch(`/market/${id}/signals`);
+    if (data && (data.signals || []).length) renderSignals(data.signals);
+    else document.getElementById("signals-list").innerHTML =
+      `<div class="empty">No signals matched to:<br><br><strong style="color:var(--black)">${title}</strong></div>`;
+  }
+
+  // Search overlay
+  let searchTimer;
+  document.getElementById("search-input").addEventListener("input", e => {
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    if (!q) { document.getElementById("search-overlay").classList.remove("visible"); return; }
+    searchTimer = setTimeout(() => runSearch(q), 320);
+  });
+  document.getElementById("search-input").addEventListener("keydown", e => {
+    if (e.key==="Escape") {
+      document.getElementById("search-overlay").classList.remove("visible");
+      e.target.value = "";
+    }
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#search-input") && !e.target.closest("#search-overlay"))
+      document.getElementById("search-overlay").classList.remove("visible");
+  });
+
+  async function runSearch(q) {
+    const data = await apiFetch(`/search?q=${encodeURIComponent(q)}&limit=8`);
+    const overlay = document.getElementById("search-overlay");
+    if (!data) { overlay.classList.remove("visible"); return; }
+    let html = "";
+    if ((data.markets||[]).length) {
+      html += `<div class="search-section-label">Markets</div>`;
+      html += (data.markets||[]).map(m =>
+        `<div class="search-result" onclick="window.open('${m.url}','_blank')">
+          <div class="search-result-title">${m.title}</div>
+          <div class="search-result-meta">${fmtPrice(m.yes_price)} YES · ${fmtVol(m.volume)} vol</div>
+        </div>`
+      ).join("");
+    }
+    if ((data.news||[]).length) {
+      html += `<div class="search-section-label">News</div>`;
+      html += (data.news||[]).map(a =>
+        `<div class="search-result" onclick="window.open('${a.url}','_blank')">
+          <div class="search-result-title">${a.title}</div>
+          <div class="search-result-meta">${a.source}</div>
+        </div>`
+      ).join("");
+    }
+    if (!html) html = `<div class="empty">No results for "${q}"</div>`;
+    overlay.innerHTML = html;
+    overlay.classList.add("visible");
+  }
+
+  async function refreshAll() {
+    await refreshStatus();
+    await refreshCategories();
+    await Promise.all([
+      refreshMarkets(),
+      refreshSignals(),
+      refreshNews(),
+      refreshMovers(),
+      refreshWhales(),
+      refreshBriefs(),
+    ]);
+  }
+
+  refreshAll();
+  setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
