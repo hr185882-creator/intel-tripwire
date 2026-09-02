@@ -53,16 +53,19 @@ jobs:
         run: |
           # Create a small sqlite fixture and run the migration into staging DB
           python - <<'PY'
-import sqlite3, json, tempfile, os
-from pathlib import Path
-p=Path('tmp_migration_fixture.db')
-if p.exists(): p.unlink()
-conn=sqlite3.connect(p)
-conn.execute('CREATE TABLE sample(id INTEGER PRIMARY KEY, value TEXT)')
-conn.execute("INSERT INTO sample(value) VALUES('smoke')")
-conn.commit(); conn.close()
-print('fixture created', p)
-PY
+          import sqlite3
+          from pathlib import Path
+
+          p = Path('tmp_migration_fixture.db')
+          if p.exists():
+              p.unlink()
+          conn = sqlite3.connect(p)
+          conn.execute('CREATE TABLE sample(id INTEGER PRIMARY KEY, value TEXT)')
+          conn.execute("INSERT INTO sample(value) VALUES('smoke')")
+          conn.commit()
+          conn.close()
+          print('fixture created', p)
+          PY
           python aurora-live/scripts/migrate_sqlite_to_postgres.py --source tmp_migration_fixture.db --target $AURORA_TEST_DATABASE_URL --truncate-target || true
 
       - name: Run smoke tests against staging DB
