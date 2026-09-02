@@ -41,7 +41,7 @@ jobs:
           python phase38_worker.py \
             --provider maritime \
             --database /tmp/aurora-ais-live.sqlite3 \
-            --max-messages 1 \
+            --max-messages 5 \
             --timeout 45
       - name: Verify durable maritime evidence
         working-directory: aurora-live
